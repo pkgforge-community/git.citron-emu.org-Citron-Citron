@@ -1,0 +1,15 @@
+name: ♻️ Sync 🗃️
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+  schedule:
+   - cron: "0 */2 * * *"  # Every 02 Hrs  
+
+jobs:
+  mirror-repo:
+    uses: "pkgforge-community/repo-data/.github/workflows/sync_repos_git.yaml@main"
+    with:
+      upstream-git-repo: "https://git.citron-emu.org/Citron/Citron"
