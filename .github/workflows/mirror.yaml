@@ -13,3 +13,5 @@ jobs:
     uses: "pkgforge-community/repo-data/.github/workflows/sync_repos_git.yaml@main"
     with:
       upstream-git-repo: "https://git.citron-emu.org/Citron/Citron"
+      git-fetch-depth: 1 #0 if want to fetch everything
+      git-filter-blob: true #False if want to fetch everything
