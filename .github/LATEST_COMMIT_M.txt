@@ -1,1 +1,1 @@
-feat(build): Add host system detection for Android cross-compilation
+ui: Disable the Auto-Stub configuration option
