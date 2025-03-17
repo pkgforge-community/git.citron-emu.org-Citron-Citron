@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: Copyright 2019 yuzu Emulator Project
+// SPDX-FileCopyrightText: Copyright 2025 citron Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <algorithm>
@@ -717,7 +718,34 @@ void RasterizerVulkan::FlushAndInvalidateRegion(DAddr addr, u64 size,
     if (Settings::IsGPULevelExtreme()) {
         FlushRegion(addr, size, which);
     }
-    InvalidateRegion(addr, size, which);
+
+    // TLB optimization to avoid redundant flushing and potential deadlocks
+    static constexpr size_t TLB_CACHE_SIZE = 128;
+    static std::array<std::pair<DAddr, u64>, TLB_CACHE_SIZE> tlb_cache;
+    static size_t tlb_cache_index = 0;
+    static std::mutex tlb_mutex;
+
+    {
+        std::scoped_lock lock{tlb_mutex};
+        // Check if this region is already in our TLB cache
+        bool found_in_tlb = false;
+        for (const auto& entry : tlb_cache) {
+            if (entry.first <= addr && addr + size <= entry.first + entry.second) {
+                // This region is already in our TLB cache, no need to flush
+                found_in_tlb = true;
+                break;
+            }
+        }
+
+        if (!found_in_tlb) {
+            // Add to TLB cache
+            tlb_cache[tlb_cache_index] = {addr, size};
+            tlb_cache_index = (tlb_cache_index + 1) % TLB_CACHE_SIZE;
+
+            // Proceed with normal invalidation
+            InvalidateRegion(addr, size, which);
+        }
+    }
 }
 
 void RasterizerVulkan::WaitForIdle() {
@@ -847,6 +875,18 @@ void RasterizerVulkan::LoadDiskResources(u64 title_id, std::stop_token stop_load
 void RasterizerVulkan::FlushWork() {
 #ifdef ANDROID
     static constexpr u32 DRAWS_TO_DISPATCH = 1024;
+
+    // Android-specific TLB optimization to prevent deadlocks
+    // This limits the maximum number of outstanding memory operations to avoid TLB thrashing
+    static constexpr u32 MAX_TLB_OPERATIONS = 64;
+    static u32 tlb_operation_counter = 0;
+
+    if (++tlb_operation_counter >= MAX_TLB_OPERATIONS) {
+        // Force a flush to ensure memory operations complete
+        scheduler.Flush();
+        scheduler.WaitIdle();  // Make sure all operations complete to clear TLB state
+        tlb_operation_counter = 0;
+    }
 #else
     static constexpr u32 DRAWS_TO_DISPATCH = 4096;
 #endif // ANDROID
@@ -928,6 +968,8 @@ bool AccelerateDMA::BufferToImage(const Tegra::DMA::ImageCopy& copy_info,
 
 void RasterizerVulkan::UpdateDynamicStates() {
     auto& regs = maxwell3d->regs;
+
+    // Always update base dynamic states.
     UpdateViewportsState(regs);
     UpdateScissorsState(regs);
     UpdateDepthBias(regs);
@@ -935,7 +977,9 @@ void RasterizerVulkan::UpdateDynamicStates() {
     UpdateDepthBounds(regs);
     UpdateStencilFaces(regs);
     UpdateLineWidth(regs);
+
     if (device.IsExtExtendedDynamicStateSupported()) {
+        // Update extended dynamic states.
         UpdateCullMode(regs);
         UpdateDepthCompareOp(regs);
         UpdateFrontFace(regs);
@@ -946,16 +990,44 @@ void RasterizerVulkan::UpdateDynamicStates() {
             UpdateDepthTestEnable(regs);
             UpdateDepthWriteEnable(regs);
             UpdateStencilTestEnable(regs);
+
             if (device.IsExtExtendedDynamicState2Supported()) {
                 UpdatePrimitiveRestartEnable(regs);
                 UpdateRasterizerDiscardEnable(regs);
                 UpdateDepthBiasEnable(regs);
             }
+
             if (device.IsExtExtendedDynamicState3EnablesSupported()) {
-                UpdateLogicOpEnable(regs);
+                // Store the original logic_op.enable state.
+                const auto oldLogicOpEnable = regs.logic_op.enable;
+
+                // Determine if the current driver is an AMD driver.
+                bool isAmdDriver = (device.GetDriverID() == VK_DRIVER_ID_AMD_OPEN_SOURCE ||
+                                    device.GetDriverID() == VK_DRIVER_ID_AMD_OPEN_SOURCE_KHR ||
+                                    device.GetDriverID() == VK_DRIVER_ID_AMD_PROPRIETARY ||
+                                    device.GetDriverID() == VK_DRIVER_ID_AMD_PROPRIETARY_KHR ||
+                                    device.GetDriverID() == VK_DRIVER_ID_MESA_RADV);
+
+                if (isAmdDriver) {
+                    // Check if any vertex attribute is of type Float.
+                    bool hasFloat = std::any_of(
+                        regs.vertex_attrib_format.begin(), regs.vertex_attrib_format.end(),
+                        [](const auto& attrib) {
+                            return attrib.type == Tegra::Engines::Maxwell3D::Regs::VertexAttribute::Type::Float;
+                        });
+
+                    // For AMD drivers, disable logic_op if a float attribute is present.
+                    regs.logic_op.enable = static_cast<u32>(!hasFloat);
+                    UpdateLogicOpEnable(regs);
+                    // Restore the original value.
+                    regs.logic_op.enable = oldLogicOpEnable;
+                } else {
+                    UpdateLogicOpEnable(regs);
+                }
                 UpdateDepthClampEnable(regs);
             }
         }
+
         if (device.IsExtExtendedDynamicState2ExtrasSupported()) {
             UpdateLogicOp(regs);
         }
@@ -963,6 +1035,7 @@ void RasterizerVulkan::UpdateDynamicStates() {
             UpdateBlending(regs);
         }
     }
+
     if (device.IsExtVertexInputDynamicStateSupported()) {
         UpdateVertexInput(regs);
     }

@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: Copyright 2019 yuzu Emulator Project
+// SPDX-FileCopyrightText: Copyright 2025 citron Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <memory>
@@ -281,6 +282,24 @@ void Scheduler::EndPendingOperations() {
         // This is problematic on Android, disable on GPU Normal.
         // query_cache->DisableStreams();
     }
+
+    // Add TLB-aware memory barrier handling for Android
+    // This reduces the likelihood of deadlocks due to memory stalls
+    static constexpr VkMemoryBarrier TLB_OPTIMIZED_BARRIER{
+        .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT,
+        // Only use necessary access flags to avoid full TLB flush
+        .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_SHADER_READ_BIT,
+    };
+
+    Record([barrier = TLB_OPTIMIZED_BARRIER](vk::CommandBuffer cmdbuf) {
+        // Use a more specific pipeline stage for better performance
+        cmdbuf.PipelineBarrier(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                              VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                              0, barrier);
+    });
 #else
     // query_cache->DisableStreams();
 #endif

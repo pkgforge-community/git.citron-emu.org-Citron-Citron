@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: Copyright 2019 yuzu Emulator Project
+// SPDX-FileCopyrightText: Copyright 2025 citron Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <algorithm>
@@ -327,8 +328,11 @@ BufferCacheRuntime::BufferCacheRuntime(const Device& device_, MemoryAllocator& m
                                        DescriptorPool& descriptor_pool)
     : device{device_}, memory_allocator{memory_allocator_}, scheduler{scheduler_},
       staging_pool{staging_pool_}, guest_descriptor_queue{guest_descriptor_queue_},
+      accelerate{nullptr},
       quad_index_pass(device, scheduler, descriptor_pool, staging_pool,
                       compute_pass_descriptor_queue) {
+    accelerate = new BufferCacheAccelerator();
+
     if (device.GetDriverID() != VK_DRIVER_ID_QUALCOMM_PROPRIETARY) {
         // TODO: FixMe: Uint8Pass compute shader does not build on some Qualcomm drivers.
         uint8_pass = std::make_unique<Uint8Pass>(device, scheduler, descriptor_pool, staging_pool,
@@ -667,6 +671,32 @@ vk::Buffer BufferCacheRuntime::CreateNullBuffer() {
     });
 
     return ret;
+}
+
+void BufferCacheRuntime::InsertTLBBarrierImpl() {
+#ifdef ANDROID
+    // Create a memory barrier specifically optimized for TLB coherency
+    // This helps prevent Android-specific deadlocks by ensuring proper
+    // GPU<->GPU memory coherency without a full pipeline stall
+    static constexpr VkMemoryBarrier TLB_BARRIER{
+        .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
+    };
+
+    scheduler.RequestOutsideRenderPassOperationContext();
+    scheduler.Record([](vk::CommandBuffer cmdbuf) {
+        cmdbuf.PipelineBarrier(
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            0, TLB_BARRIER, {}, {});
+    });
+#endif
+}
+
+BufferCacheRuntime::~BufferCacheRuntime() {
+    delete accelerate;
 }
 
 } // namespace Vulkan

@@ -1,1 +1,1 @@
-v0.6-canary-refresh
+v0.6.1-canary-refresh

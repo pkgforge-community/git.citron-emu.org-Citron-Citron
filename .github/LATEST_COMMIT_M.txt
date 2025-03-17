@@ -1,1 +1,1 @@
-service/ssl: Register ssl:s service to fix game hangs
+feat(build): Add host system detection for Android cross-compilation
