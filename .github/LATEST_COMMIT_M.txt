@@ -1,1 +1,1 @@
-ui: Disable the Auto-Stub configuration option
+ui: Disable the Kiosk (Quest) Mode configuration option
