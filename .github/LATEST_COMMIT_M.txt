@@ -1,1 +1,1 @@
-ui: Disable the Kiosk (Quest) Mode configuration option
+Update Vulkan-related dependencies and vcpkg
