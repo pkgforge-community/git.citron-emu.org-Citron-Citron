@@ -1,1 +1,1 @@
-Revert "Update submodule URLs from yuzu-mirror to Citron repositories"
+Update external dependency URLs and versions
