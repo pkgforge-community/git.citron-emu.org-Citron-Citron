@@ -1,1 +1,1 @@
-Update Vulkan-related dependencies and vcpkg
+Revert "Update submodule URLs from yuzu-mirror to Citron repositories"
