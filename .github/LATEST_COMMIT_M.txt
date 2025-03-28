@@ -1,1 +1,1 @@
-build: fix linux compilation
+feat(vulkan): implement enhanced texture and shader management
