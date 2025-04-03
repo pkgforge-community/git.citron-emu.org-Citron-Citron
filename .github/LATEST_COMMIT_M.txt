@@ -1,1 +1,1 @@
-video_core: Enhance Vulkan shader compilation with async threading system
+renderer/friend: Improve reversed depth handling and Friend service
