@@ -1,1 +1,1 @@
-renderer/friend: Improve reversed depth handling and Friend service
+nvn: Optimize shader performance by enhancing NVN bias settings
