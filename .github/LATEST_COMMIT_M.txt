@@ -1,1 +1,1 @@
-feat(video_core): Implement HybridMemory for advanced Vulkan memory management
+Add Windows support to Hybrid Memory Manager
