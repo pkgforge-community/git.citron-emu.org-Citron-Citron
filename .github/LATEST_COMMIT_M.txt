@@ -1,1 +1,1 @@
-Add Windows support to Hybrid Memory Manager
+feat(video_core): Fix Linux compilation issues in Hybrid Memory Manager
