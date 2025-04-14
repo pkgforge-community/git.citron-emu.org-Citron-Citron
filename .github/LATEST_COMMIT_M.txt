@@ -1,1 +1,1 @@
-feat(video_core): Fix Linux compilation issues in Hybrid Memory Manager
+refactor(vulkan): remove depth buffer workarounds and excessive logging
