@@ -1,1 +1,1 @@
-feat: add option to respect present interval 0 as unlocked FPS
+feat: add CPU clock rate slider to settings
