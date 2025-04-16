@@ -1,1 +1,1 @@
-service/sockets: Implement network services for new firmware versions
+feat: add option to respect present interval 0 as unlocked FPS
