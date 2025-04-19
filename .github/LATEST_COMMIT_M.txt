@@ -1,1 +1,1 @@
-fix(vulkan): address compiler warnings for Linux
+externals: Update Vulkan dependencies to latest versions
