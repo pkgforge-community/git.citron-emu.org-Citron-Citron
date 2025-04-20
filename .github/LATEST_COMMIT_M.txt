@@ -1,1 +1,1 @@
-externals: Update Vulkan dependencies to latest versions
+feat(services): Implement nn::socket, nn::nifm, and nn::nim networking services
