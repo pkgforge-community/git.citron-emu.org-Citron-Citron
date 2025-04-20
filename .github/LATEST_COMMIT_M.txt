@@ -1,1 +1,1 @@
-feat(services): Implement nn::socket, nn::nifm, and nn::nim networking services
+video_core: Improve texture cache memory management to prevent leaks
