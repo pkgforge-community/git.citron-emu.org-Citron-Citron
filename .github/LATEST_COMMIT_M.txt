@@ -1,1 +1,1 @@
-video_core: Improve texture cache memory management to prevent leaks
+android: Update Vulkan Validation Layer to 1.4.309.0
