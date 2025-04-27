@@ -1,1 +1,1 @@
-socket: Implement missing errno values and improve network error handling
+build: bump VulkanHeaders minimum version
